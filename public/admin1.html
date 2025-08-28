@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Page</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    .filter-icon {
+      font-size: 30px;   
+      color: purple;    
+    }
+  </style>
+</head>
+<body>    
+    <div class="flex flex-col gap-y-[50px]">
+      <div class="w-256 h-[90px] rounded-sm border-2 shadow-xl flex flex-col">
+       <div class="flex flex-row">
+        <div>
+        <p class="text-[21px]">🛡️</p>
+        </div>
+        <div class="ml-[3px] p-px">
+        <h1 class="text-2xl font-bold text-black ">Competition Control Panel</h1>
+         </div>  
+      </div>
+      <div class="flex flex-row gap-x-[1100px]">
+       <div>
+       <p class="text-[13px] ml-[30px]">Manage Participant Screens in real time</p>
+         
+      </div>
+      <div>
+        <p class="text-[13px] ml-[30px]">Connected Clients </p>
+      </div>
+      </div>
+      <h1 class="text-right mr-[90px] text-[20px] font-bold text-red-500" id="client_count">0</h1>
+    </div>
+    <div class="w-[1500px] h-[150px] rounded-sm border-2 shadow-xl flex flex-col ml-[10px]">
+      <div class="flex flex-row">
+          <div>
+            <span class="material-icons filter-icon">tune</span>
+          </div>
+          <div class="ml-[5px] p-px">
+        <h1 class="text-2xl font-bold text-black ">Quick Controls</h1>
+          
+         </div>  
+      </div>
+      <div class="flex flex-row gap-[20px]"> 
+          <div class="w-[400px] h-[70px] rounded-sm border-2 shadow-xl ml-[20px] bg-gray-200">
+                <h3 class="text-[15px] text-center text-black-300">Blackout Duration</h3>
+                <div class="mt-[5px] text-center">
+                 (ms): <input type="number" id="duration" value="5000"><br><br>
+                 </div>
+          </div>
+          <div class="w-[1000px] h-[70px] rounded-sm border-2 shadow-xl bg-gray-200">
+              <h3 class="text-[18px] text-center text-black-300">Bulk Actions</h3>
+              <div class="flex flex-row gap-x-[80px]">
+             <button class="w-[200px] h-[30px] bg-red-500 text-white rounded-md shadow-xl text-[13px] hover:bg-red-700" onclick="blackoutSelected()">Blackout Selected</button>
+             <button class="w-[200px] h-[30px] bg-red-500 text-white rounded-md shadow-xl text-[13px] hover:bg-red-700" onclick="endSelected()">End Blackout Selected</button>
+             <button class="w-[200px] h-[30px] bg-red-500 text-white rounded-md shadow-xl text-[13px] hover:bg-red-700" onclick="blackoutAll()">Blackout All</button>
+             <button class="w-[200px] h-[30px] bg-red-500 text-white rounded-md shadow-xl text-[13px] hover:bg-red-700" onclick="endAll()">End Blackout All</button>
+          </div>
+          </div>
+          
+      </div>
+    </div>
+    <div class="w-[1500px] h-[400px] rounded-sm border-2 shadow-xl flex flex-col ml-[10px]">
+       <div class="flex flex-row">
+           <div>
+            <p class="text-[21px]">👥</p>
+
+           </div>
+             <div class="ml-[3px] p-px">
+            <h1 class="text-2xl font-bold text-black ">Participants</h1>
+         </div>  
+
+       </div>
+       <div id="players" class="space-y-2 overflow-y-auto h-[400px]">
+
+          
+       </div>
+
+    </div>
+
+
+    </div>
+    <script>
+    const socket = io();
+    let allPlayers = [];
+    socket.emit("register_admin");
+    
+    socket.on("update_players", (players) => {
+        allPlayers = players;
+        const container = document.getElementById("players");
+        const countelem=document.getElementById("client_count");
+        countelem.textContent=players.length;
+        container.innerHTML = "";
+        if(players.length === 0){
+  const emptymsg=document.createElement("div");
+  emptymsg.className="flex flex-col items-center justify-center text-gray-600 py-10";
+  emptymsg.innerHTML=`
+     <span class="material-icons text-5xl mb-2 text-gray-400">group_off</span>
+     <p class="font-semibold text-lg">No participants connected</p>
+     <p class="text-sm text-gray-500">Participants will appear when they join</p>
+  `;
+  container.appendChild(emptymsg);
+}
+
+
+        players.forEach(p => {
+            
+            const wrapper = document.createElement("div");
+            wrapper.className = "flex items-center space-x-2 p-2 rounded hover:bg-gray-100";
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.id = p.id;
+            checkbox.value = p.id;
+            checkbox.className = "cursor-pointer";
+
+            const label = document.createElement("label");
+            label.htmlFor = p.id;
+            label.innerText = `${p.id} - ${p.hostname} - ${p.ip}`;
+            label.className = "cursor-pointer text-sm text-[20px] font-bold";
+
+            wrapper.appendChild(checkbox);
+            wrapper.appendChild(label);
+            container.appendChild(wrapper);
+        });
+    });
+    function getSelectedPlayers() {
+    return allPlayers.filter(p => document.getElementById(p.id).checked).map(p => p.id);
+}
+
+function blackoutSelected() {
+    const duration = parseInt(document.getElementById("duration").value);
+    const selected = getSelectedPlayers();
+    console.log("Blackout Selected clicked:", selected, duration);
+    socket.emit("selectiveBlackout", { players: selected, duration });
+}
+
+function endSelected() {
+    const selected = getSelectedPlayers();
+    console.log("End Selected clicked:", selected);
+    socket.emit("selectiveEndBlackout", { players: selected });
+}
+
+function blackoutAll() {
+    const duration = parseInt(document.getElementById("duration").value);
+    console.log("Blackout All clicked:", duration);
+    socket.emit("blackoutAll", duration);
+}
+
+function endAll() {
+    console.log("End All clicked");
+    socket.emit("endBlackoutAll");
+}
+  </script>
+   
+
+</body>
+
+
+
+
+
+</html>

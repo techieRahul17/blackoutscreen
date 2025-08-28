@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 30px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Admin Panel</h1>
+  <p>Control participant blackout screens from here.</p>
+
+  <!-- Trigger blackout for X milliseconds -->
+  <button onclick="triggerBlackout(5000)">Blackout 5s</button>
+  <button onclick="triggerBlackout(10000)">Blackout 10s</button>
+  <button onclick="triggerBlackout(30000)">Blackout 30s</button>
+
+  <!-- End blackout immediately -->
+  <button onclick="endBlackout()">End Blackout</button>
+
+  <script>
+    const socket = io(); // connect to Node.js server
+
+    function triggerBlackout(duration) {
+      // duration in milliseconds
+      socket.emit("blackout", duration);
+    }
+
+    function endBlackout() {
+      socket.emit("endBlackout");
+    }
+  </script>
+</body>
+</html>

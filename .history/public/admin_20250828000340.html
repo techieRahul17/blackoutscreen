@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Panel</title>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <h2>Connected Players</h2>
+  <div id="players"></div>
+
+  <h2>Controls</h2>
+  Duration (ms): <input type="number" id="duration" value="5000"><br><br>
+
+  <button onclick="blackoutSelected()">Blackout Selected</button>
+  <button onclick="endSelected()">End Blackout Selected</button>
+  <button onclick="blackoutAll()">Blackout All</button>
+  <button onclick="endAll()">End Blackout All</button>
+
+  <script>
+    const socket = io();
+    let allPlayers = [];
+
+    socket.on("connect", () => {
+      console.log("Admin connected to server, socket ID:", socket.id);
+    });
+
+    socket.on("disconnect", () => {
+      console.log("Disconnected from server");
+    });
+
+    // debug to see any incoming event
+    socket.onAny((event, ...args) => {
+      console.log("Event received on admin:", event, args);
+    });
+
+    // update connected players
+    socket.on("update_players", (players) => {
+      allPlayers = players;
+      const container = document.getElementById("players");
+      container.innerHTML = "";
+      players.forEach(p => {
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.id = p.id;
+        checkbox.value = p.id;
+
+        const label = document.createElement("label");
+        label.htmlFor = p.id;
+        label.innerText = `${p.id} - ${p.hostname} - ${p.ip}`;
+
+        container.appendChild(checkbox);
+        container.appendChild(label);
+        container.appendChild(document.createElement("br"));
+      });
+    });
+
+    function getSelectedPlayers() {
+      return allPlayers.filter(p => document.getElementById(p.id).checked).map(p => p.id);
+    }
+
+    function blackoutSelected() {
+      const duration = parseInt(document.getElementById("duration").value);
+      const selected = getSelectedPlayers();
+      console.log("Admin clicked Blackout Selected:", selected, "duration:", duration);
+      socket.emit("selectiveBlackout", { players: selected, duration });
+    }
+
+    function endSelected() {
+      const selected = getSelectedPlayers();
+      console.log("Admin clicked End Blackout Selected:", selected);
+      socket.emit("selectiveEndBlackout", { players: selected });
+    }
+
+    function blackoutAll() {
+      const duration = parseInt(document.getElementById("duration").value);
+      console.log("Admin clicked Blackout All, duration:", duration);
+      socket.emit("blackoutAll", duration);
+    }
+
+    function endAll() {
+      console.log("Admin clicked End All Blackout");
+      socket.emit("endBlackoutAll");
+    }
+  </script>
+</body>
+</html>
