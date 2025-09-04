@@ -15,28 +15,34 @@ root.withdraw()  # hide initially
 root.attributes("-fullscreen", True)
 root.attributes("-topmost", True)
 root.configure(bg='black')
-lab = tk.Label(text="Hello",font = ("Courier New",20,"bold"),bg="black",fg="white")
+lab = tk.Label(text="Hello", font=("Courier New", 20, "bold"), bg="black", fg="white")
 
 def label_text():
-    # update random text
     lab.config(text="".join(random.choices("qwertyuiopasdfghjklzxcvbnm", k=500)))
-    lab.pack(expand=True)  # ensure it's visible
-    # schedule again after 1000 ms
+    lab.pack(expand=True)
     root.after(1000, label_text)
 
-# Start the label updater once
 root.after(1000, label_text)
+
 def process_queue():
     while not event_queue.empty():
         event, value = event_queue.get()
         if event == "blackout":
+            # --- FIX IS HERE ---
+            # Tell the OS this is a tool window that shouldn't get focus
+            root.attributes('-toolwindow', True)
             root.deiconify()
             
             duration = value
-            root.after(duration, lambda: root.withdraw())
+            # Schedule the hide and reset the attribute
+            root.after(duration, lambda: (root.withdraw(), root.attributes('-toolwindow', False)))
+            
         elif event == "endBlackout":
             root.withdraw()
-    root.after(50, process_queue)  # check queue every 50ms
+            # Also reset the attribute here
+            root.attributes('-toolwindow', False)
+            
+    root.after(50, process_queue)
 
 root.after(50, process_queue)
 
@@ -65,16 +71,20 @@ def on_end_blackout():
 def disconnect():
     print("Disconnected from server")
 
-# Run Socket.IO in a separate thread so Tkinter mainloop is free
+# Run Socket.IO in a separate thread
 def socket_thread():
-    sio.connect("http://10.106.60.188:3000")  # replace with your server IP
-    sio.wait()
+    try:
+        sio.connect("http://192.168.0.5:3000")  # replace with your server IP
+        sio.wait()
+    except socketio.exceptions.ConnectionError as e:
+        print(f"Connection failed: {e}")
 
 threading.Thread(target=socket_thread, daemon=True).start()
 
-root.protocol("WM_DELETE_WINDOW",lambda:None)
-root.bind("<Alt-F4>",lambda e:"break")
-root.bind("<Alt-Tab>",lambda e:"break")
-#root.bind("<Win>",lambda e:"break")
+# Prevent closing
+root.protocol("WM_DELETE_WINDOW", lambda: None)
+root.bind("<Alt-F4>", lambda e: "break")
+root.bind("<Alt-Tab>", lambda e: "break")
+
 # Run Tkinter main loop
 root.mainloop()

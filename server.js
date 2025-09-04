@@ -1,11 +1,11 @@
 // server.js
 const express = require("express");
 const http = require("http");
-const { Server } = require("socket.io");
+const socketio = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = socketio(server);
 
 // serve admin.html and assets
 app.use(express.static("public"));
@@ -63,12 +63,14 @@ io.on("connection", (socket) => {
             s.emit("blackout", duration);
         }
     });
+
     socket.on("register_admin", () => {
-    socket.isAdmin = true;
-    console.log("Admin connected:", socket.id);
-    // Always send current players, even if empty
-    socket.emit("update_players", getAllPlayers());
-});
+        socket.isAdmin = true;
+        console.log("Admin connected:", socket.id);
+        // Always send current players, even if empty
+        socket.emit("update_players", getAllPlayers());
+    });
+
     // End selective blackout
     socket.on("selectiveEndBlackout", ({ players }) => {
         console.log(`End selective blackout for ${players}`);
