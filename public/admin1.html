@@ -4,7 +4,6 @@
     <title>Admin Page</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
   <style>
     .filter-icon {
@@ -42,14 +41,13 @@
           </div>
           <div class="ml-[5px] p-px">
         <h1 class="text-2xl font-bold text-black ">Quick Controls</h1>
-          
          </div>  
       </div>
       <div class="flex flex-row gap-[20px]"> 
           <div class="w-[400px] h-[70px] rounded-sm border-2 shadow-xl ml-[20px] bg-gray-200">
                 <h3 class="text-[15px] text-center text-black-300">Blackout Duration</h3>
                 <div class="mt-[5px] text-center">
-                 (ms): <input type="number" id="duration" value="5000"><br><br>
+                 (minutes): <input type="number" id="duration" value="5"><br><br>
                  </div>
           </div>
           <div class="w-[1000px] h-[70px] rounded-sm border-2 shadow-xl bg-gray-200">
@@ -61,28 +59,19 @@
              <button class="w-[200px] h-[30px] bg-red-500 text-white rounded-md shadow-xl text-[13px] hover:bg-red-700" onclick="endAll()">End Blackout All</button>
           </div>
           </div>
-          
       </div>
     </div>
     <div class="w-[1500px] h-[400px] rounded-sm border-2 shadow-xl flex flex-col ml-[10px]">
        <div class="flex flex-row">
            <div>
             <p class="text-[21px]">👥</p>
-
            </div>
              <div class="ml-[3px] p-px">
             <h1 class="text-2xl font-bold text-black ">Participants</h1>
          </div>  
-
        </div>
-       <div id="players" class="space-y-2 overflow-y-auto h-[400px]">
-
-          
-       </div>
-
+       <div id="players" class="space-y-2 overflow-y-auto h-[400px]"></div>
     </div>
-
-
     </div>
     <script>
     const socket = io();
@@ -96,72 +85,53 @@
         countelem.textContent=players.length;
         container.innerHTML = "";
         if(players.length === 0){
-  const emptymsg=document.createElement("div");
-  emptymsg.className="flex flex-col items-center justify-center text-gray-600 py-10";
-  emptymsg.innerHTML=`
-     <span class="material-icons text-5xl mb-2 text-gray-400">group_off</span>
-     <p class="font-semibold text-lg">No participants connected</p>
-     <p class="text-sm text-gray-500">Participants will appear when they join</p>
-  `;
-  container.appendChild(emptymsg);
-}
-
-
+          const emptymsg=document.createElement("div");
+          emptymsg.className="flex flex-col items-center justify-center text-gray-600 py-10";
+          emptymsg.innerHTML=`
+             <span class="material-icons text-5xl mb-2 text-gray-400">group_off</span>
+             <p class="font-semibold text-lg">No participants connected</p>
+             <p class="text-sm text-gray-500">Participants will appear when they join</p>
+          `;
+          container.appendChild(emptymsg);
+        }
         players.forEach(p => {
-            
             const wrapper = document.createElement("div");
             wrapper.className = "flex items-center space-x-2 p-2 rounded hover:bg-gray-100";
-
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.id = p.id;
             checkbox.value = p.id;
             checkbox.className = "cursor-pointer";
-
             const label = document.createElement("label");
             label.htmlFor = p.id;
             label.innerText = `${p.id} - ${p.hostname} - ${p.ip}`;
             label.className = "cursor-pointer text-sm text-[20px] font-bold";
-
             wrapper.appendChild(checkbox);
             wrapper.appendChild(label);
             container.appendChild(wrapper);
         });
     });
     function getSelectedPlayers() {
-    return allPlayers.filter(p => document.getElementById(p.id).checked).map(p => p.id);
-}
-
-function blackoutSelected() {
-    const duration = parseInt(document.getElementById("duration").value);
-    const selected = getSelectedPlayers();
-    console.log("Blackout Selected clicked:", selected, duration);
-    socket.emit("selectiveBlackout", { players: selected, duration });
-}
-
-function endSelected() {
-    const selected = getSelectedPlayers();
-    console.log("End Selected clicked:", selected);
-    socket.emit("selectiveEndBlackout", { players: selected });
-}
-
-function blackoutAll() {
-    const duration = parseInt(document.getElementById("duration").value);
-    console.log("Blackout All clicked:", duration);
-    socket.emit("blackoutAll", duration);
-}
-
-function endAll() {
-    console.log("End All clicked");
-    socket.emit("endBlackoutAll");
-}
-  </script>
-   
-
+        return allPlayers.filter(p => document.getElementById(p.id).checked).map(p => p.id);
+    }
+    function blackoutSelected() {
+        const durationMin = parseInt(document.getElementById("duration").value);
+        const duration = durationMin * 60000;
+        const selected = getSelectedPlayers();
+        socket.emit("selectiveBlackout", { players: selected, duration });
+    }
+    function endSelected() {
+        const selected = getSelectedPlayers();
+        socket.emit("selectiveEndBlackout", { players: selected });
+    }
+    function blackoutAll() {
+        const durationMin = parseInt(document.getElementById("duration").value);
+        const duration = durationMin * 60000;
+        socket.emit("blackoutAll", duration);
+    }
+    function endAll() {
+        socket.emit("endBlackoutAll");
+    }
+    </script>
 </body>
-
-
-
-
-
 </html>
