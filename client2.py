@@ -84,16 +84,16 @@ def set_fullscreen():
     w,h = root.winfo_screenwidth(), root.winfo_screenheight()
     root.geometry(f"{w}x{h}+0+0")
 
-def show_overlay(duration):
+def show_overlay(duration, resume_from_pause=False):
     global overlay_visible, blackout_until, blackout_duration, paused, paused_black_remaining, paused_comp_remaining
 
-    if paused:  # resume from paused values
+    if resume_from_pause and paused:  # resume from paused values
         blackout_duration = paused_black_remaining
         blackout_until = int(time.time() * 1000) + paused_black_remaining
         competition_resume_at = int(time.time() * 1000)
         globals()["competition_start"] = competition_resume_at - (competition_total - paused_comp_remaining)
         paused = False
-    else:       # fresh blackout
+    else:  # fresh blackout (full duration)
         blackout_duration = duration
         blackout_until = int(time.time() * 1000) + duration
 
@@ -136,13 +136,18 @@ def start_recurring_blackout(duration):
         now = int(time.time() * 1000)
         if paused or now >= competition_start + competition_total:
             return  # stop recurring if paused or competition ended
+
+        # Always start blackout fresh with full duration
         show_overlay(duration)
-        # schedule hide after duration, then 1 min later restore
+
+        # schedule blackout end → 1 min lift → restart
         def lift_then_restore():
             hide_overlay(auto=True)
             global recurring_blackout_timer
-            recurring_blackout_timer = root.after(60000, cycle)  # 1 min lift
-        recurring_blackout_timer = root.after(duration, lift_then_restore)
+            recurring_blackout_timer = root.after(60000, cycle)  # restart full blackout after 1 min gap
+
+        root.after(duration, lift_then_restore)
+
     cycle()
 
 def ticker():
@@ -182,7 +187,11 @@ def process_queue():
     while not event_queue.empty():
         e,v = event_queue.get()
         if e == "blackout":
-            start_recurring_blackout(int(v))
+            # If resuming from pause, continue remaining time; else start recurring fresh
+            if paused:
+                show_overlay(int(v), resume_from_pause=True)
+            else:
+                start_recurring_blackout(int(v))
         elif e == "endBlackout":
             end_blackout_pause()
     root.after(50, process_queue)
