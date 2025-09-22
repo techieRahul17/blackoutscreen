@@ -5,7 +5,7 @@ sio = socketio.Client()
 event_queue = Queue()
 
 IS_WINDOWS = platform.system() == "Windows"
-IS_LINUX = platform.system() == "Linux"
+IS_LINUX   = platform.system() == "Linux"
 
 QUOTES = [
     "Keep going. Everything you need will come at the perfect time.",
@@ -17,6 +17,8 @@ QUOTES = [
     "You’ve got this. One keypress at a time."
 ]
 def random_quote(): return random.choice(QUOTES)
+
+username = input("Enter your name: ").strip() or "Anonymous"
 
 root = tk.Tk()
 root.withdraw()
@@ -52,6 +54,12 @@ competition_start = int(time.time() * 1000)
 blackout_duration = 0
 blackout_until = 0
 
+# pause/resume state
+paused = False
+paused_comp_remaining = None
+paused_black_remaining = None
+auto_end = False
+
 if IS_WINDOWS:
     import ctypes
     user32 = ctypes.windll.user32
@@ -76,9 +84,18 @@ def set_fullscreen():
     root.geometry(f"{w}x{h}+0+0")
 
 def show_overlay(duration):
-    global overlay_visible, blackout_until, blackout_duration
-    blackout_duration = duration
-    blackout_until = int(time.time() * 1000) + duration
+    global overlay_visible, blackout_until, blackout_duration, paused, paused_black_remaining, paused_comp_remaining
+
+    if paused:  # resume from paused values
+        blackout_duration = paused_black_remaining
+        blackout_until = int(time.time() * 1000) + paused_black_remaining
+        competition_resume_at = int(time.time() * 1000)
+        globals()["competition_start"] = competition_resume_at - (competition_total - paused_comp_remaining)
+        paused = False
+    else:       # fresh blackout
+        blackout_duration = duration
+        blackout_until = int(time.time() * 1000) + duration
+
     quote_var.set(random_quote())
     set_fullscreen()
     if IS_WINDOWS:
@@ -92,32 +109,53 @@ def show_overlay(duration):
         root.lift()
     overlay_visible = True
 
-def hide_overlay():
-    global overlay_visible, blackout_duration, blackout_until
+def hide_overlay(auto=False):
+    global overlay_visible, blackout_duration, blackout_until, auto_end
     overlay_visible = False
     blackout_duration = 0
     blackout_until = 0
     root.withdraw()
+    auto_end = auto
+
+def end_blackout_pause():
+    global paused, paused_comp_remaining, paused_black_remaining, blackout_until
+
+    now = int(time.time() * 1000)
+    paused = True
+    paused_comp_remaining = max(0, (competition_start + competition_total - now))
+    paused_black_remaining = max(0, blackout_until - now)
+
+    hide_overlay(auto=False)
 
 def ticker():
     now = int(time.time() * 1000)
 
-    comp_rem = max(0, (competition_start + competition_total - now) // 1000)
-    comp_var.set(f"Competition • Ends in {comp_rem//60}m {comp_rem%60}s")
-
-    if overlay_visible:
-        rem = max(0, blackout_until - now)
-        black_var.set(f"Blackout • Ends in {rem//1000//60}m {rem//1000%60}s")
-        if rem <= 0:
-            black_var.set("Blackout • Finished")
-            hide_overlay()
+    if paused:
+        comp_var.set(f"Competition • Paused at {paused_comp_remaining//1000//60}m {paused_comp_remaining//1000%60}s")
+        if paused_black_remaining > 0:
+            black_var.set(f"Blackout • Paused at {paused_black_remaining//1000//60}m {paused_black_remaining//1000%60}s")
+        else:
+            black_var.set("Blackout • Not active")
     else:
-        black_var.set("Blackout • Not active")
+        comp_rem = max(0, (competition_start + competition_total - now) // 1000)
+        comp_var.set(f"Competition • Ends in {comp_rem//60}m {comp_rem%60}s")
 
-    if comp_rem <= 0 and overlay_visible:
-        hide_overlay()
-        comp_var.set("Competition • Finished")
-        black_var.set("Blackout • Lifted (competition ended)")
+        if overlay_visible:
+            rem = max(0, blackout_until - now)
+            black_var.set(f"Blackout • Ends in {rem//1000//60}m {rem//1000%60}s")
+            if rem <= 0:
+                black_var.set("Blackout • Finished")
+                hide_overlay(auto=True)
+        else:
+            if auto_end:
+                black_var.set("Blackout • Lifted (auto)")
+            else:
+                black_var.set("Blackout • Not active")
+
+        if comp_rem <= 0 and overlay_visible:
+            hide_overlay(auto=True)
+            comp_var.set("Competition • Finished")
+            black_var.set("Blackout • Lifted (competition ended)")
 
     root.after(200, ticker)
 root.after(200, ticker)
@@ -128,13 +166,16 @@ def process_queue():
         if e == "blackout":
             show_overlay(int(v))
         elif e == "endBlackout":
-            hide_overlay()
+            if isinstance(v, dict) and v.get("auto", False):
+                hide_overlay(auto=True)
+            else:
+                end_blackout_pause()
     root.after(50, process_queue)
 root.after(50, process_queue)
 
 @sio.event
 def connect():
-    sio.emit("register_client", {"hostname": platform.node()})
+    sio.emit("register_client", {"username": username, "hostname": platform.node()})
 
 @sio.on("your_id")
 def on_id(pid):
@@ -145,8 +186,8 @@ def on_blackout(d):
     event_queue.put(("blackout", d))
 
 @sio.on("endBlackout")
-def on_end():
-    event_queue.put(("endBlackout", None))
+def on_end(data=None):
+    event_queue.put(("endBlackout", data))
 
 def socket_thread():
     try:
