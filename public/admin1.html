@@ -26,7 +26,6 @@
       <div class="flex flex-row gap-x-[1100px]">
        <div>
        <p class="text-[13px] ml-[30px]">Manage Participant Screens in real time</p>
-         
       </div>
       <div>
         <p class="text-[13px] ml-[30px]">Connected Clients </p>
@@ -104,7 +103,7 @@
             checkbox.className = "cursor-pointer";
             const label = document.createElement("label");
             label.htmlFor = p.id;
-            label.innerText = `${p.id} - ${p.hostname} - ${p.ip}`;
+            label.innerText = `${p.username} (${p.id}) - ${p.hostname} - ${p.ip}`; // fixed undefined
             label.className = "cursor-pointer text-sm text-[20px] font-bold";
             wrapper.appendChild(checkbox);
             wrapper.appendChild(label);
