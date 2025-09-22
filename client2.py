@@ -48,11 +48,12 @@ comp_lbl.place(relx=0.5, rely=0.55, anchor="center")
 black_lbl.place(relx=0.5, rely=0.65, anchor="center")
 
 overlay_visible = False
-competition_total = 30 * 60 * 1000
+competition_total = 30 * 60 * 1000  # 30 min
 competition_start = int(time.time() * 1000)
 
 blackout_duration = 0
 blackout_until = 0
+recurring_blackout_timer = None  # for 1-min restore
 
 # pause/resume state
 paused = False
@@ -110,22 +111,39 @@ def show_overlay(duration):
     overlay_visible = True
 
 def hide_overlay(auto=False):
-    global overlay_visible, blackout_duration, blackout_until, auto_end
+    global overlay_visible, blackout_duration, blackout_until, auto_end, recurring_blackout_timer
     overlay_visible = False
     blackout_duration = 0
     blackout_until = 0
     root.withdraw()
     auto_end = auto
+    if recurring_blackout_timer:
+        root.after_cancel(recurring_blackout_timer)
+        recurring_blackout_timer = None
 
 def end_blackout_pause():
-    global paused, paused_comp_remaining, paused_black_remaining, blackout_until
-
+    global paused, paused_comp_remaining, paused_black_remaining, blackout_until, recurring_blackout_timer
     now = int(time.time() * 1000)
     paused = True
     paused_comp_remaining = max(0, (competition_start + competition_total - now))
     paused_black_remaining = max(0, blackout_until - now)
-
     hide_overlay(auto=False)
+
+def start_recurring_blackout(duration):
+    global recurring_blackout_timer
+
+    def cycle():
+        now = int(time.time() * 1000)
+        if paused or now >= competition_start + competition_total:
+            return  # stop recurring if paused or competition ended
+        show_overlay(duration)
+        # schedule hide after duration, then 1 min later restore
+        def lift_then_restore():
+            hide_overlay(auto=True)
+            global recurring_blackout_timer
+            recurring_blackout_timer = root.after(60000, cycle)  # 1 min lift
+        recurring_blackout_timer = root.after(duration, lift_then_restore)
+    cycle()
 
 def ticker():
     now = int(time.time() * 1000)
@@ -152,7 +170,7 @@ def ticker():
             else:
                 black_var.set("Blackout • Not active")
 
-        if comp_rem <= 0 and overlay_visible:
+        if comp_rem <= 0:
             hide_overlay(auto=True)
             comp_var.set("Competition • Finished")
             black_var.set("Blackout • Lifted (competition ended)")
@@ -164,12 +182,9 @@ def process_queue():
     while not event_queue.empty():
         e,v = event_queue.get()
         if e == "blackout":
-            show_overlay(int(v))
+            start_recurring_blackout(int(v))
         elif e == "endBlackout":
-            if isinstance(v, dict) and v.get("auto", False):
-                hide_overlay(auto=True)
-            else:
-                end_blackout_pause()
+            end_blackout_pause()
     root.after(50, process_queue)
 root.after(50, process_queue)
 
